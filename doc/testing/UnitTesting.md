@@ -111,7 +111,70 @@ verify(resultSet).close();
 
 **Rationale**: If you're mocking a method with `when()`, you already know it will be called. Verifying it adds no value and creates maintenance burden.
 
-### 4. Use verifyNoMoreInteractions Carefully
+### 4. Prefer Specific Object Stubs Over `any()` Matchers
+Use specific objects in stubs when you control the test data and know what will be passed.
+
+❌ **AVOID**:
+```java
+when(mapper.convert(any(InputType.class))).thenReturn(output);
+```
+
+✅ **PREFER**: Stub with the actual object when possible:
+```java
+var input = createInput();
+var output = createOutput();
+when(mapper.convert(input)).thenReturn(output);
+```
+
+**When to use `any()`**:
+- Service mutates objects unpredictably (e.g., setting IDs, timestamps)
+- Multiple different objects of the same type might be passed
+- Using `thenAnswer()` to handle different cases dynamically
+- Testing with argument captors to verify behavior rather than exact values
+
+**Benefits of specific stubs**:
+- More precise and catches incorrect arguments
+- Makes test intent clearer
+- Easier to debug when stubs don't match
+
+### 5. Use Simple `when().thenReturn()` for Basic Returns
+Reserve `doAnswer()` and `thenAnswer()` for complex logic.
+
+❌ **AVOID** for simple returns:
+```java
+doAnswer(inv -> true).when(service).process(data);
+```
+
+✅ **PREFER**:
+```java
+when(service.process(data)).thenReturn(true);
+```
+
+**Use `thenAnswer()` only when**:
+- You need to compute the return value based on arguments
+- You need to inspect or validate arguments
+- You have conditional logic based on the input
+- You need to perform side effects (though prefer `doAnswer()` for void methods)
+
+### 6. Stub the Complete Service Flow
+Include ALL repository and service interactions that occur in the code path being tested.
+
+❌ **AVOID** partial stubbing:
+```java
+when(repository.save(entity)).thenReturn(entity);
+// Missing: repository.findByKey() that happens before save
+```
+
+✅ **PREFER** complete stubbing:
+```java
+when(repository.findByKey(key)).thenReturn(Optional.empty());  // Check for duplicates
+when(repository.save(entity)).thenReturn(entity);              // Save
+when(repository.findById(id)).thenReturn(Optional.of(entity)); // Fetch after save
+```
+
+**Rationale**: Missing stubs can cause unexpected null returns or strict stubbing violations. Map out the service flow and stub every external call.
+
+### 7. Use verifyNoMoreInteractions Carefully
 When using `verifyNoMoreInteractions()` in `@AfterEach`, only include mocks that should have NO unexpected interactions:
 
 ```java
@@ -428,7 +491,76 @@ void findModule_negative_multipleModulesFound() {
 
 **Rationale**: Ensure all error paths from utility methods are covered in the composed logic tests.
 
-### 7. Testing with Context Dependencies
+### 7. Testing Services That Create Internal Copies
+When services create defensive copies or deep copies of input parameters to avoid side effects:
+
+```java
+@Test
+void operation_positive_withDeepCopy() {
+    var input = createInput();
+    var inputCopy = createInput();  // Separate object with same content
+    var output = createOutput();
+    var entity = createEntity(inputCopy);
+
+    // Stub the copy operation
+    when(mapper.deepCopy(input)).thenReturn(inputCopy);
+
+    // Stub subsequent operations with the copy, not the original
+    when(mapper.toEntity(inputCopy)).thenReturn(entity);
+    when(repository.save(entity)).thenReturn(entity);
+    when(mapper.toOutput(entity)).thenReturn(output);
+
+    var actual = service.operation(input);
+
+    assertThat(actual).isEqualTo(output);
+}
+```
+
+**Key Points**:
+- Create separate test objects for input and copy (different instances, same content)
+- Stub the copy/clone operation to return your controlled copy
+- Use the copy object in subsequent stubs, not the original input
+- This prevents issues where the service modifies the copy but your stubs expect the original
+
+**Common copy methods to stub**:
+- `mapper.deepCopy()`
+- `BeanUtils.copyProperties()`
+- Custom clone/copy methods
+- Builder-based copies
+
+### 8. Use Fluent API Consistently in Test Data
+Prefer fluent API over setters for creating test data:
+
+❌ **AVOID**:
+```java
+var entity = new Entity();
+entity.setId(ID);
+entity.setName("test");
+entity.setEnabled(true);
+```
+
+✅ **PREFER**:
+```java
+var entity = new Entity()
+    .id(ID)
+    .name("test")
+    .enabled(true);
+```
+
+Or even better, use helper methods:
+```java
+var entity = createEntity()
+    .id(ID)
+    .enabled(true);
+```
+
+**Benefits**:
+- More concise and readable
+- Chainable for easier test data construction
+- Consistent with DTO patterns
+- Easier to see the complete state at a glance
+
+### 9. Testing with Context Dependencies
 ```java
 private void setupContextMocks() {
     when(context.getFolioModuleMetadata()).thenReturn(moduleMetadata);
@@ -445,7 +577,7 @@ void testWithContext() {
 }
 ```
 
-### 8. Testing Null Validation
+### 10. Testing Null Validation
 ```java
 @Test
 void operation_negative_parameterIsNull() {
@@ -554,6 +686,10 @@ Before committing your tests, verify:
 - [ ] No `@MockitoSettings(strictness = Strictness.LENIENT)` annotation
 - [ ] No unnecessary stubbing (all `when()` statements are used)
 - [ ] Only verify methods that are NOT mocked
+- [ ] Prefer specific object stubs over `any()` matchers when test data is controlled
+- [ ] Use simple `when().thenReturn()` for basic returns (not `doAnswer()`)
+- [ ] All repository and service interactions in the code path are stubbed
+- [ ] Services that create internal copies have the copy operation stubbed
 - [ ] Test names follow the `methodName_scenario_expectedBehavior` pattern
 - [ ] Each test is independent and can run in isolation
 - [ ] Resources (connections, streams, etc.) are verified to be closed
@@ -561,23 +697,30 @@ Before committing your tests, verify:
 - [ ] Constants are used for reusable test data (IDs, error messages, etc.)
 - [ ] Helper methods are used to eliminate duplication (object creation, assertions, finding objects, etc.)
 - [ ] Tests are organized with clear Arrange-Act-Assert sections
+- [ ] Fluent API used consistently for test data creation
 - [ ] Parameterized tests use simplified `Stream<Type>` when testing single parameters
 - [ ] Explicit type declarations used for lambdas when var type inference fails
 - [ ] Exact matching tests include similar values that should NOT match
 - [ ] All error paths from utility methods are covered in composed logic tests
+- [ ] Unused imports removed
 
 ## Summary
 
 **Key Takeaways:**
 1. **Never use lenient mode** - write precise tests instead
-2. **Use constants for test data** - define reusable test values at class level
-3. **Extract helper methods** - eliminate duplication for object creation, assertions, finding objects, and mock setup
-4. **Only stub what you need** - use helper methods for common mock setups
-5. **Only verify unmocked interactions** - verifying mocked calls is redundant
-6. **Keep tests independent** - each test should stand alone
-7. **Close resources** - always verify that connections, streams, etc. are closed
-8. **Clear naming** - test names should describe the scenario and expected outcome
-9. **Simplify parameterized tests** - use `Stream<Type>` for single parameters instead of `Stream<Arguments>`
-10. **Explicit types for lambdas** - declare types explicitly when var inference fails
-11. **Test exact matching** - include similar values to verify only exact matches are selected
-12. **Cover all error paths** - test all exception scenarios from utility methods in composed logic
+2. **Prefer specific stubs over `any()`** - use actual objects when you control test data; reserve `any()` for dynamic scenarios
+3. **Use simple stubbing syntax** - `when().thenReturn()` for basic returns, `thenAnswer()` only for complex logic
+4. **Stub the complete flow** - include all repository/service interactions that occur in the code path
+5. **Handle internal copies** - stub copy/deepCopy operations and use the copy in subsequent stubs
+6. **Use constants for test data** - define reusable test values at class level
+7. **Extract helper methods** - eliminate duplication for object creation, assertions, finding objects, and mock setup
+8. **Only stub what you need** - use helper methods for common mock setups
+9. **Only verify unmocked interactions** - verifying mocked calls is redundant
+10. **Keep tests independent** - each test should stand alone
+11. **Close resources** - always verify that connections, streams, etc. are closed
+12. **Clear naming** - test names should describe the scenario and expected outcome
+13. **Use fluent API consistently** - prefer `.field(value)` over `setField(value)` in test data
+14. **Simplify parameterized tests** - use `Stream<Type>` for single parameters instead of `Stream<Arguments>`
+15. **Explicit types for lambdas** - declare types explicitly when var inference fails
+16. **Test exact matching** - include similar values to verify only exact matches are selected
+17. **Cover all error paths** - test all exception scenarios from utility methods in composed logic
