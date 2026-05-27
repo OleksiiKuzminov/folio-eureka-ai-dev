@@ -21,7 +21,7 @@ OpenCode comes in multiple forms, but for Product Owners, the **Desktop App** is
 | Form | What it is | When to use it |
 |------|------------|----------------|
 | **Desktop App** | A standalone graphical application. You chat with the agent, see its progress, attach files, and approve actions easily. | **Recommended for POs.** Use this for everything below. |
-| **CLI / TUI** | A command-line tool that runs in your terminal. | Power-user automation. You won't need it on day one. |
+| **Terminal (command-line)** | A text-based tool that runs in your terminal. | Power-user automation. You won't need it on day one. |
 
 ---
 
@@ -72,8 +72,9 @@ OpenCode supports 75+ providers; the full list lives at
 choose provider → authenticate → done.
 
 > **Where are credentials stored?** Locally on your machine in
-> `~/.local/share/opencode/auth.json`. They never leave your computer except
-> when sent to the provider you chose.
+> `~/.local/share/opencode/auth.json` (macOS/Linux) or
+> `%APPDATA%\opencode\auth.json` (Windows). They never leave your computer
+> except when sent to the provider you chose.
 
 ### 3.3 Pick a model
 
@@ -102,12 +103,91 @@ If you get a response, you are ready.
 
 ## 4. Install the FOLIO skills
 
-The FOLIO team publishes a skills repository at
-[`folio-org/folio-eureka-ai-dev`](https://github.com/folio-org/folio-eureka-ai-dev).
-Skills are reusable instructions that teach the agent **how** to write a user
-story, **how** to write a bug, etc. — so output is consistent across the team.
+Before you can use the `write-user-story` and `write-bug` skills, OpenCode
+needs a local working folder and the FOLIO skills package installed in it.
 
-### 4.1 Pick a project folder
+There are two ways to do this. **Pick the one that suits you best.**
+
+---
+
+### Option A — Guided setup inside OpenCode *(recommended)*
+
+If you prefer to avoid the terminal entirely, OpenCode can walk you through
+the setup step by step.
+
+1. Open the **OpenCode Desktop App** and start a new chat.
+2. Make sure you have a model connected (see Section 3).
+3. Copy and paste the prompt below into the chat and press Enter.
+4. Follow the agent's instructions one step at a time.
+
+> **Important:** OpenCode can guide you through installation, but it cannot
+> install Node.js for you if it is missing. If Node.js is not on your machine
+> yet, the agent will stop and direct you to install it first — just follow
+> those instructions, then come back and continue.
+
+#### Ready-to-paste setup prompt
+
+```
+Help me set up OpenCode for FOLIO Product Owner ticket drafting in a way
+that is safe for a non-technical user.
+
+My goal:
+- Create a local folder for Jira drafting work.
+- Install the FOLIO skills from folio-org/folio-eureka-ai-dev.
+- Make sure I can use write-user-story and write-bug in OpenCode.
+
+Please follow these rules:
+1. Explain each step in plain English before asking me to do it.
+2. Do not assume I know terminal commands.
+3. First, check whether Node.js is installed by asking me to run
+   `node --version` and explain how to open a terminal on my
+   operating system.
+4. If Node.js is missing, stop and tell me to install the LTS version
+   from https://nodejs.org, then wait for me to confirm before
+   continuing.
+5. Once Node.js is confirmed, guide me to create a folder named
+   `folio-jira-drafts` in my home directory.
+6. Then guide me to open that folder in a terminal and run:
+     npx skills add folio-org/folio-eureka-ai-dev
+7. After installation, help me verify that the skills are available.
+8. Then remind me how to open that folder in the OpenCode Desktop App
+   and run `/init` if needed.
+9. At the end, give me a short checklist confirming that setup
+   is complete.
+
+If there is a simpler OpenCode-native way to install or verify skills
+from inside the app, prefer that and explain it clearly.
+```
+
+---
+
+### Option B — Manual setup
+
+If you are comfortable with a terminal, you can run the steps directly.
+
+#### 4B.1 Check for Node.js
+
+`npx` is a tool that comes with **Node.js**. It lets you run small programs
+(like the skills installer) without manually installing anything extra.
+If Node.js is not installed yet, the commands below will not work.
+
+Open a terminal:
+- **macOS:** press ⌘ Space, type `Terminal`, press Enter.
+- **Windows:** press Windows + R, type `cmd`, press Enter.
+
+Then run:
+
+```bash
+node --version
+```
+
+- If you see a version number (e.g. `v20.11.0`), continue to the next step.
+- If you see an error, install the **LTS** version of Node.js from
+  <https://nodejs.org> (just click the LTS download button and run the
+  installer, accepting all defaults). Restart your terminal and re-run
+  `node --version` to confirm.
+
+#### 4B.2 Pick a project folder
 
 Skills are installed into a specific project folder. For PO work, create a
 folder to hold your drafts:
@@ -117,16 +197,20 @@ mkdir -p ~/folio-jira-drafts
 cd ~/folio-jira-drafts
 ```
 
-### 4.2 Install the skills
+Alternatively, create the folder using your file manager (Finder on macOS,
+File Explorer on Windows) — navigate to your home folder, right-click, and
+create a new folder named `folio-jira-drafts`.
 
-From inside that folder run:
+#### 4B.3 Install the skills
+
+From inside that folder, run:
 
 ```bash
 npx skills add folio-org/folio-eureka-ai-dev
 ```
 
-This downloads the skills (including `write-user-story` and `write-bug`) into
-the folder. To update later:
+This downloads the skills (including `write-user-story` and `write-bug`)
+into the folder. To update later:
 
 ```bash
 npx skills update folio-org/folio-eureka-ai-dev
@@ -134,9 +218,23 @@ npx skills update folio-org/folio-eureka-ai-dev
 
 See the [README](../../README.md) for the full list of available skills.
 
-### 4.3 Launch OpenCode in that folder
+#### 4B.4 Verify the install succeeded
 
-Open the **OpenCode Desktop App** and use the **File > Open Folder...** menu (or the equivalent button in the UI) to open `~/folio-jira-drafts`.
+After the command finishes, check what was installed:
+
+```bash
+npx skills list
+```
+
+You should see `write-user-story` and `write-bug` listed. If not, re-run
+the install command above.
+
+---
+
+### 4.1 Launch OpenCode in that folder *(both options)*
+
+Open the **OpenCode Desktop App** and use the **File > Open Folder...** menu
+(or the equivalent button in the UI) to open `~/folio-jira-drafts`.
 
 Inside the chat, run **once per project**:
 
@@ -146,6 +244,10 @@ Inside the chat, run **once per project**:
 
 This generates an `AGENTS.md` file so the agent understands the folder. For
 a drafts folder you can keep the defaults.
+
+> **After this one-time setup, all normal PO work happens inside the
+> OpenCode Desktop App.** You will not need to touch a terminal again
+> unless you want to update the skills package.
 
 ---
 
@@ -399,8 +501,8 @@ If you want to keep a local archive of every ticket you draft:
 Save the final Markdown draft to drafts/<JIRA-KEY>.md in this folder.
 ```
 
-Switch out of plan mode first by pressing **Tab** again so the agent is
-allowed to write files.
+Switch out of plan mode first by pressing **Tab** again (the same Tab you
+used in Step 2) so the agent is allowed to write files.
 
 ### Step 9 — Share the conversation (optional)
 
@@ -428,7 +530,7 @@ A shareable URL is copied to your clipboard.
 | Get a list of all commands | `/help` |
 | Reference a file in your prompt | Type `@` and start typing the filename |
 | Add a screenshot to a prompt | Drag and drop the image into the chat |
-| Update FOLIO skills to the latest version | `npx skills update folio-org/folio-eureka-ai-dev` |
+| Update FOLIO skills to the latest version | Open a terminal in your `folio-jira-drafts` folder and run `npx skills update folio-org/folio-eureka-ai-dev`. If `npx` is not recognised, install Node.js LTS from <https://nodejs.org> first. |
 
 ---
 
