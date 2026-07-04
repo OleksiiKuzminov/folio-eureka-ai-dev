@@ -6,15 +6,19 @@ skills — and file them straight into Jira.
 
 > **What you will learn**
 > 1. What Claude Code is and how to install the Desktop app.
-> 2. How to install the FOLIO Product Owner plugin (two chat commands).
+> 2. How to install the FOLIO Product Owner plugin — **Option A** (a settings
+>    file in your drafts folder, no terminal) or **Option B** (two one-time
+>    terminal commands).
 > 3. How to connect Jira with a normal browser login — no tokens.
 > 4. How to use the `write-user-story` and `write-bug` skills.
 > 5. The **end-to-end workflow** from idea to a filed Jira issue.
 
-> **No terminal. No Node.js.** Unlike the
-> [OpenCode setup](po-opencode-onboarding.md), everything in this guide
-> happens inside the Claude Code app. The terminal appears only in
-> [Appendix A](#appendix-a--terminal-cli-setup), which is optional.
+> **Terminal-free daily use.** Everything you do day-to-day happens inside
+> the Claude Code Desktop app. Only the one-time plugin install offers a
+> choice: **Option A** stays entirely in the app; **Option B** uses a
+> terminal once, for two commands. Unlike the
+> [OpenCode setup](po-opencode-onboarding.md), no Node.js is required either
+> way.
 
 ---
 
@@ -30,7 +34,12 @@ way to get started.
 | Form | What it is | When to use it |
 |------|------------|----------------|
 | **Desktop app** | A standalone graphical application. You chat with the agent, open folders with a click, and approve actions with buttons. | **Recommended for POs.** Use this for everything below. |
-| **Terminal (CLI)** | A text-based tool that runs in your terminal. | Power users. See [Appendix A](#appendix-a--terminal-cli-setup). You won't need it on day one. |
+| **Terminal (CLI)** | A text-based tool that runs in your terminal. | Power users — plus the one-time setup in [Option B](#option-b--one-time-terminal-setup). See [Appendix A](#appendix-a--terminal-cli-reference). |
+
+> **Good to know:** slash commands you may see in blog posts — `/plugin`,
+> `/mcp`, `/resume` — belong to the **terminal (CLI)** version. The Desktop
+> app uses buttons and menus for the same things. This guide always shows
+> the Desktop way first.
 
 ---
 
@@ -84,63 +93,150 @@ Since you just created it yourself, answer yes.
 The FOLIO Product Owner preset ships as a **Claude Code plugin** called
 `folio-po`. One install gives you:
 
-- the four PO skills — `write-user-story`, `write-bug`,
-  `write-pr-description`, `skill-feedback`;
+- the PO skills — `write-user-story`, `write-bug`, `skill-feedback`;
 - the **official Atlassian Jira MCP server**, pre-configured (you only log
   in — see [Section 5](#5-connect-jira)).
 
-In the chat, run these two commands, one after the other:
+> **Already managed by your org?** If your Claude admin distributes the
+> `folio-ai-dev` marketplace through managed settings, you can skip both
+> options: click the **+** button next to the prompt box → **Plugins** →
+> **Add plugin**, pick `folio-po`, and jump to
+> [Section 5](#5-connect-jira).
 
-```
-/plugin marketplace add folio-org/folio-eureka-ai-dev
-```
+Pick **one** of the two options below. Both end in the same place: the
+`folio-ai-dev` marketplace registered and the `folio-po` plugin installed.
 
-```
-/plugin install folio-po@folio-ai-dev
-```
+### Option A — Stay in the Desktop app *(recommended)*
 
-Approve the confirmation prompts. Then verify the install — either run:
+The Desktop app cannot register a new plugin marketplace from its menus
+yet, but it **does** read a small settings file inside your drafts folder.
+You don't have to create that file by hand — ask the agent to do it.
 
-```
-/plugin
-```
+1. Open `folio-jira-drafts` in the Desktop app
+   ([Section 3](#3-create-your-drafts-folder-and-open-it)).
+2. Paste this prompt into the chat **exactly as written**:
 
-…and check that `folio-po` is listed and enabled, or simply ask:
+   ````
+   Create a file at .claude/settings.json in this folder with exactly this
+   content, then show me the result:
+
+   {
+     "extraKnownMarketplaces": {
+       "folio-ai-dev": {
+         "source": {
+           "source": "github",
+           "repo": "folio-org/folio-eureka-ai-dev"
+         }
+       }
+     },
+     "enabledPlugins": {
+       "folio-po@folio-ai-dev": true
+     }
+   }
+   ````
+
+3. Approve the file creation when the agent asks.
+4. Start a **new session** in the same folder. Claude Code reads the
+   settings file and asks you to install the `folio-ai-dev` marketplace and
+   trust the `folio-po` plugin. Approve the prompts.
+5. **If no prompt appears:** click the **+** button next to the prompt box
+   → **Plugins** → **Add plugin**. The plugin browser now lists the
+   `folio-ai-dev` marketplace — select `folio-po` and install it.
+
+> **Note:** enabling the plugin through the folder's settings file scopes
+> it to this folder. Since all your Jira drafting happens in
+> `folio-jira-drafts`, that is exactly what you want.
+
+### Option B — One-time terminal setup
+
+If Option A gives you trouble (or a teammate is setting you up), the
+terminal route takes two commands and you never need it again afterwards.
+The CLI is a **native binary — Node.js is not required.**
+
+1. Install the CLI.
+
+   **macOS:** open Terminal (⌘ Space, type `Terminal`) and run:
+
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+
+   **Windows:** open PowerShell (Windows key, type `PowerShell`) and run:
+
+   ```powershell
+   irm https://claude.ai/install.ps1 | iex
+   ```
+
+2. Start it in your drafts folder and sign in when prompted:
+
+   ```bash
+   cd ~/folio-jira-drafts
+   claude
+   ```
+
+3. Run these two commands in the chat, one after the other, and approve the
+   confirmation prompts:
+
+   ```
+   /plugin marketplace add folio-org/folio-eureka-ai-dev
+   ```
+
+   ```
+   /plugin install folio-po@folio-ai-dev
+   ```
+
+4. Type `/exit`, close the terminal, and go back to the Desktop app. The
+   Desktop app and the CLI share the same configuration, so the plugin is
+   now available in your Desktop sessions too.
+
+### Verify the install (either option)
+
+Start a new session in `folio-jira-drafts` and ask:
 
 ```
 Which FOLIO skills do you have available?
 ```
 
-The agent should mention `write-user-story` and `write-bug`.
+The agent should mention `write-user-story` and `write-bug`. You can also
+check visually: in the Desktop app, click **+ → Plugins** and confirm
+`folio-po` is listed and enabled (in the CLI, run `/plugin`).
 
-> **Troubleshooting:** if `/plugin marketplace add` is rejected with a
-> policy message, your organization restricts plugin marketplaces — ask
-> your Claude admin to allow `folio-org/folio-eureka-ai-dev`.
+> **Troubleshooting:** if the marketplace is rejected with a policy
+> message, your organization restricts plugin marketplaces — ask your
+> Claude admin to allow `folio-org/folio-eureka-ai-dev` (and ideally to
+> distribute it via managed settings so this whole section becomes one
+> click).
 
-To update the plugin later:
+**Updating the plugin later:** in the Desktop app, open **+ → Plugins**,
+select `folio-po`, and reinstall/update it from there. In the CLI, run
+`/plugin marketplace update folio-ai-dev`. (Auto-update is off by default
+for third-party marketplaces.)
 
-```
-/plugin marketplace update folio-ai-dev
-```
+> The developer-oriented `write-pr-description` skill also lives in the
+> same repo but is **not** bundled in the `folio-po` plugin. If you want
+> it, see [Appendix A.3](#a3-npx-skills-alternative).
 
 ---
 
 ## 5. Connect Jira
 
 The plugin already contains the connection settings for the **official
-Atlassian MCP server**. You just need to log in once:
+Atlassian MCP server**. You just need to log in once.
 
-1. In the chat, run:
+**In the Desktop app:** start a new session in your drafts folder and ask:
 
-   ```
-   /mcp
-   ```
+```
+Search Jira for open issues assigned to me and list the top 5.
+```
 
-2. Select **atlassian** from the list.
-3. Choose **Authenticate**. Your browser opens the Atlassian login page.
-4. Log in with your normal FOLIO Jira account
-   (<https://folio-org.atlassian.net>) and approve the access request.
-5. Back in Claude Code, the server shows as connected.
+The first time the agent reaches for Jira, Claude Code asks you to
+authenticate the **atlassian** server. Approve it — your browser opens the
+Atlassian login page. Log in with your normal FOLIO Jira account
+(<https://folio-org.atlassian.net>) and approve the access request. Back in
+Claude Code, the request completes and your issues appear.
+
+**In the CLI:** run `/mcp`, select **atlassian**, choose **Authenticate**,
+and complete the same browser login.
 
 No API tokens, no configuration files — it is the same login you use for
 Jira in the browser, and you can revoke it any time from your Atlassian
@@ -302,12 +398,12 @@ Open the Desktop app and open your `folio-jira-drafts` folder.
 
 ### Step 2 — Switch to **Plan mode** before drafting
 
-Switch the session into **Plan mode** — use the mode toggle in the Desktop
-app (in the CLI, press **Shift+Tab**).
+Switch the session into **Plan mode** — use the mode selector next to the
+send button in the Desktop app (in the CLI, press **Shift+Tab**).
 
-In Plan mode the agent will not write any files or take actions — it only
-**proposes** a draft in the chat. This is exactly what you want for ticket
-writing.
+In Plan mode the agent may still read files and look things up, but it does
+not create or change anything — it only **proposes** a draft in the chat.
+This is exactly what you want while writing and refining a ticket.
 
 ### Step 3 — Invoke the skill with your prompt
 
@@ -354,6 +450,10 @@ Repeat freely — the first draft is rarely the final draft.
 
 ### Step 6 — File the ticket via the Jira MCP *(main path)*
 
+First, **switch out of Plan mode** (toggle it back with the mode selector)
+— creating a Jira issue is a real action, and in Plan mode the agent only
+proposes.
+
 Because the official Atlassian MCP server is connected, the agent can search
 and create issues for you. After approving the draft, say:
 
@@ -386,8 +486,8 @@ natively, which is why the conversion step exists.)
 
 ### Step 8 — Save your work *(optional)*
 
-To keep a local archive of every ticket you draft, leave Plan mode (toggle
-it off) and say:
+To keep a local archive of every ticket you draft, say (with Plan mode still
+off):
 
 ```
 Save the final Markdown draft to drafts/<JIRA-KEY>.md in this folder.
@@ -397,18 +497,18 @@ Save the final Markdown draft to drafts/<JIRA-KEY>.md in this folder.
 
 ## 9. Daily-use cheat sheet
 
-| You want to… | Do this |
-|---|---|
-| Start Claude Code | Open the Desktop app and open `folio-jira-drafts` |
-| Switch between **Plan** (propose only) and normal mode | Mode toggle in the app (CLI: **Shift+Tab**) |
-| Log in to Jira / check the connection | `/mcp` |
-| See installed plugins and skills | `/plugin` |
-| Update the FOLIO plugin | `/plugin marketplace update folio-ai-dev` |
-| Interrupt the agent mid-answer | **Esc** |
-| Resume an earlier conversation | `/resume` |
-| Reference a file in your prompt | Type `@` and start typing the filename |
-| Add a screenshot to a prompt | Drag and drop the image into the chat |
-| Get a list of all commands | `/help` |
+| You want to… | Desktop app | Terminal (CLI) |
+|---|---|---|
+| Start Claude Code | Open the app and open `folio-jira-drafts` | `cd ~/folio-jira-drafts` then `claude` |
+| Switch between **Plan** (propose only) and normal mode | Mode selector next to the send button | **Shift+Tab** |
+| Log in to Jira / check the connection | Approve the auth prompt when the agent first uses Jira | `/mcp` |
+| See installed plugins and skills | **+ → Plugins** | `/plugin` |
+| Update the FOLIO plugin | **+ → Plugins** → select `folio-po` | `/plugin marketplace update folio-ai-dev` |
+| Interrupt the agent mid-answer | **Stop** button (or type a correction and send it) | **Esc** |
+| Resume an earlier conversation | Pick the session in the sidebar | `/resume` |
+| Reference a file in your prompt | Type `@` and start typing the filename | Same |
+| Add a screenshot to a prompt | Drag and drop the image into the chat | Same |
+| Browse available commands and skills | Type `/` in the prompt box | `/help` |
 
 ---
 
@@ -442,47 +542,36 @@ Save the final Markdown draft to drafts/<JIRA-KEY>.md in this folder.
 ## 11. Where to get help
 
 - **Claude Code docs:** <https://code.claude.com/docs/en/quickstart>
-- **Desktop app guide:** <https://code.claude.com/docs/en/desktop-quickstart>
+- **Desktop app guide:** <https://code.claude.com/docs/en/desktop>
 - **Connecting tools (MCP):** <https://code.claude.com/docs/en/mcp>
 - **Plugins:** <https://code.claude.com/docs/en/discover-plugins>
+- **Settings reference** (the keys used in Option A): <https://code.claude.com/docs/en/settings>
 - **FOLIO skills repo & issues:** <https://github.com/folio-org/folio-eureka-ai-dev>
 - **Skill feedback:** invoke the `skill-feedback` skill at the end of a
   session, or open an issue directly in the repo above.
 
 ---
 
-## Appendix A — Terminal (CLI) setup
+## Appendix A — Terminal (CLI) reference
 
 For POs who prefer the terminal, or when a teammate wants to script things.
-The CLI is a **native binary — Node.js is not required.**
+Installation is covered in [Option B](#option-b--one-time-terminal-setup);
+the CLI is a **native binary — Node.js is not required.**
 
-### A.1 Install
-
-**macOS:** open Terminal (⌘ Space, type `Terminal`) and run:
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash
-```
-
-**Windows:** open PowerShell (Windows key, type `PowerShell`) and run:
-
-```powershell
-irm https://claude.ai/install.ps1 | iex
-```
-
-### A.2 Start it in your drafts folder
+### A.1 Daily use in the CLI
 
 ```bash
 cd ~/folio-jira-drafts
 claude
 ```
 
-Sign in when prompted. From here, everything in this guide works the same:
-the `/plugin` commands from [Section 4](#4-install-the-folio-po-plugin), the
-`/mcp` login from [Section 5](#5-connect-jira), and **Shift+Tab** for Plan
-mode.
+Everything in this guide works the same: the `/plugin` commands from
+[Option B](#option-b--one-time-terminal-setup), the `/mcp` login from
+[Section 5](#5-connect-jira), and **Shift+Tab** for Plan mode. Because the
+CLI and the Desktop app share configuration, anything you install or
+authenticate in one is available in the other.
 
-### A.3 Jira MCP without the plugin *(fallback)*
+### A.2 Jira MCP without the plugin *(fallback)*
 
 If you only want the Jira connection (no skills), you can add the Atlassian
 server directly:
@@ -494,17 +583,17 @@ claude mcp add --transport http atlassian https://mcp.atlassian.com/v1/mcp --sco
 Then run `/mcp` inside Claude Code to authenticate, as in
 [Section 5](#5-connect-jira).
 
-### A.4 `npx skills` alternative
+### A.3 `npx skills` alternative
 
 If you already use the [skills.sh](https://skills.sh/docs) workflow from the
-[README](../../README.md), the Product Owner preset installs with:
+[README](../../README.md), the Product Owner skill set installs with:
 
 ```bash
 npx skills add folio-org/folio-eureka-ai-dev --skill write-user-story --skill write-bug --skill write-pr-description --skill skill-feedback
 ```
 
 This requires Node.js and installs only the skills — you still add the Jira
-MCP server separately (A.3). The plugin route in
+MCP server separately (A.2). The plugin route in
 [Section 4](#4-install-the-folio-po-plugin) does both in one step and is the
 recommended path.
 
