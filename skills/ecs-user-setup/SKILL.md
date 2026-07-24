@@ -3,137 +3,42 @@ name: ecs-user-setup
 description: Expert guide for setting up users in Enhanced Consortia Support (ECS) tests. Use when generating or reviewing Cypress tests where ecs_enabled is true in TestRail, or when user mentions consortia/ECS/multi-tenant tests.
 ---
 
-## When to Use This Skill
+# ECS User Setup
 
-Invoke this skill when:
-- TestRail test case has `ecs_enabled: true`
-- User mentions "consortia test", "ECS test", or "multi-tenant test"
-- Test involves multiple tenants (Central, College, University)
-- Test requires affiliation switching or cross-tenant operations
-- Reviewing/debugging user creation/deletion in consortia tests
+Use for tests where TestRail has `ecs_enabled: true`, the user mentions consortia / ECS / multi-tenant, the test spans Central / College / University, the test needs affiliation switching or cross-tenant operations, or you are debugging user creation/deletion in a consortia test.
 
-**DO NOT use this skill for regular (non-ECS) tests.**
+**Do not use for regular non-ECS tests.**
 
-## Core Principles
+Pattern variants (multi-user, capabilities-based, no-switch, troubleshooting): `references/patterns.md`.
 
-### Principle 0: TestRail Preconditions Are Law
-**ALWAYS create users in the tenant specified by TestRail preconditions.**
+## Constants
 
-- TestRail says "User A has been created in member-1 tenant" → Create in College tenant
-- TestRail says "User B has been created in central tenant" → Create in Central tenant
-- **ECS rules supplement TestRail requirements - they NEVER override them**
+| Constant | Tenant |
+|---|---|
+| `cy.resetTenant()` | Central (Consortia) — the default |
+| `Affiliations.College` | member-1 |
+| `Affiliations.University` | member-2 |
+| `tenantNames.central` | `"Consortia"` |
+| `tenantNames.college` | `"College"` |
+| `tenantNames.university` | `"University"` |
 
-### Principle 1: User Creation Tenant Context
-Users must be created in the exact tenant specified by TestRail preconditions.
+## Rules
 
-**Implementation:**
-```javascript
-// For member-1 tenant (College)
-cy.setTenant(Affiliations.College);
-cy.createTempUser([permissions_for_member1]).then((userProperties) => {
-  userA = userProperties;
-  // Continue setup...
-});
+**0. TestRail preconditions are law.** Create each user in the exact tenant the preconditions name — "User A has been created in member-1 tenant" means College, "in central tenant" means Central. ECS rules supplement TestRail requirements; they never override them. When in doubt, follow the preconditions literally.
 
-// For central tenant (default)
-cy.resetTenant(); // Central is default
-cy.createTempUser([permissions_for_central]).then((userProperties) => {
-  userB = userProperties;
-  // Continue setup...
-});
-```
+**1. Creation tenant sets the primary affiliation, and primary affiliation is the login tenant — always.** A user created in College logs into College. So if a test must work in a given tenant from the start without a UI switch, **create the user in that tenant**. Only add an affiliation switch when TestRail actually specifies a login tenant different from the creation tenant.
 
-**Key Constants:**
-- `Affiliations.College` = member-1 tenant
-- `Affiliations.University` = member-2 tenant
-- `cy.resetTenant()` = Central (Consortia) tenant (default)
+**2. Central affiliation is automatic; member affiliations are manual.** Users created by admin get Central (Consortia) automatically. Never assign it by hand — `cy.assignAffiliationToUser(Affiliations.Consortia, ...)` is wrong. Use `cy.assignAffiliationToUser()` for College and University only.
 
-### Principle 2: Login Tenant Context (Primary Affiliation)
-**Users automatically log into their PRIMARY AFFILIATION - the tenant where they were created.**
+**3. Cross-tenant permissions are assigned from inside the target tenant.** Switch context with `cy.resetTenant()` / `cy.setTenant()`, then `cy.assignPermissionsToExistingUser()` (or `cy.assignCapabilitiesToExistingUser()` on Eureka).
 
-**CRITICAL FOR TEST DESIGN**: If a test needs to work in a specific tenant from the start (without UI affiliation switching), **create the user in that tenant**.
+**4. Delete each user from the tenant it was created in** — not from where it logged in or worked. A mismatch here is what produces 404s in cleanup.
 
-**Primary Affiliation Rules:**
-- The tenant where a user is created becomes their **primary affiliation**
-- UI login automatically opens the primary affiliation tenant
-- To avoid affiliation switching in tests, create users in the tenant where they'll primarily work
+**5. An affiliation switch is a UI operation, a tenant context switch is an API operation.** `ConsortiumManager.switchActiveAffiliation()` is not interchangeable with `cy.setTenant()`.
 
-**Design Pattern:**
-```javascript
-// ✅ GOOD: User needs to work in College tenant - create in College
-cy.setTenant(Affiliations.College);
-cy.createTempUser([permissions]).then((userProperties) => {
-  userA = userProperties;
-  // User A's primary affiliation = College
-  // Login will open College tenant directly
-});
+## Canonical setup
 
-// ❌ BAD: User needs College but created in Central - requires switch
-cy.resetTenant(); // Central
-cy.createTempUser([permissions]).then((userProperties) => {
-  userA = userProperties;
-  // User A's primary affiliation = Central
-  // Login opens Central, must switch to College in UI
-});
-```
-
-**When Affiliation Switch IS Needed:**
-
-If TestRail requires login to a different tenant than primary affiliation:
-1. User logs in (automatically to creation tenant = primary affiliation)
-2. User must **switch affiliation** in UI using `ConsortiumManager.switchActiveAffiliation()`
-
-**Example:**
-```javascript
-// User created in College (primary), needs to work in Central
-cy.resetTenant();
-cy.login(userA.username, userA.password); // Logs into College (primary affiliation)
-
-// Switch to Central tenant in UI
-ConsortiumManager.switchActiveAffiliation(tenantNames.college, tenantNames.central);
-```
-
-**Tenant Name Constants:**
-- `tenantNames.central` = "Consortia"
-- `tenantNames.college` = "College"
-- `tenantNames.university` = "University"
-
-### Principle 3: User Deletion Tenant Context
-**Always delete users from the same tenant they were originally created in.**
-
-```javascript
-after('Delete test data', () => {
-  cy.getAdminToken();
-  
-  // User A was created in College
-  cy.setTenant(Affiliations.College);
-  Users.deleteViaApi(userA.userId);
-  
-  // User B was created in Central
-  cy.resetTenant();
-  Users.deleteViaApi(userB.userId);
-});
-```
-
-### Principle 4: Automatic Central Affiliation
-**Users created by admin automatically get Central (Consortia) affiliation.**
-
-- **NEVER manually assign Central affiliation** - it's automatic
-- Only manually assign member tenant affiliations (College, University)
-- Use `cy.assignAffiliationToUser()` for member affiliations only
-
-```javascript
-// BAD - Don't do this:
-cy.assignAffiliationToUser(Affiliations.Consortia, userA.userId); // WRONG!
-
-// GOOD - Only assign member affiliations:
-cy.assignAffiliationToUser(Affiliations.College, userA.userId);
-cy.assignAffiliationToUser(Affiliations.University, userA.userId);
-```
-
-## Complete Implementation Pattern
-
-### Standard ECS User Setup
+Two users in different tenants, one of which switches affiliation mid-test.
 
 ```javascript
 describe('ECS Test Example', () => {
@@ -143,37 +48,30 @@ describe('ECS Test Example', () => {
 
   before('Create test data', () => {
     cy.getAdminToken();
-    
+
     // TestRail: "User A has been created in member-1 tenant with permissions X, Y"
-    // IMPORTANT: Create in member-1 because User A's primary affiliation = College
-    // This means User A will log into College tenant automatically
-    cy.setTenant(Affiliations.College); // Create in member-1
+    // Created in College → primary affiliation College → logs into College
+    cy.setTenant(Affiliations.College);
     cy.createTempUser([
       Permissions.inventoryAll.gui,
       Permissions.uiQuickMarcQuickMarcBibliographicEditorAll.gui,
     ]).then((userProperties) => {
       userA = userProperties;
-      
-      // Assign Central tenant permissions (Central affiliation is automatic)
+
+      // Central permissions (Central affiliation itself is automatic)
       cy.resetTenant();
       cy.assignPermissionsToExistingUser(userA.userId, [
         Permissions.consortiaSettingsConsortiumManagerView.gui,
       ]);
-      
-      // Assign additional member affiliations if needed
+
+      // Extra member affiliations, only if TestRail asks for them
       cy.assignAffiliationToUser(Affiliations.University, userA.userId);
     });
-    
+
     // TestRail: "User B has been created in central tenant with permissions Z"
-    // IMPORTANT: Create in Central because User B's primary affiliation = Central
-    // This means User B will log into Central tenant automatically
-    cy.resetTenant(); // Create in Central (default)
-    cy.createTempUser([
-      Permissions.settingsUsersView.gui,
-    ]).then((userBProperties) => {
+    cy.resetTenant();
+    cy.createTempUser([Permissions.settingsUsersView.gui]).then((userBProperties) => {
       userB = userBProperties;
-      // User B automatically has Central affiliation
-      // Assign member affiliations if TestRail specifies them
       cy.assignAffiliationToUser(Affiliations.College, userB.userId);
     });
   });
@@ -181,266 +79,48 @@ describe('ECS Test Example', () => {
   it('C123456: Test requiring affiliation switch', {
     tags: ['extendedPathECS', 'spitfire', 'C123456']
   }, () => {
-    // TestRail: "User A logs in and switches to Central tenant"
     cy.resetTenant();
     cy.login(userA.username, userA.password, {
       path: TopMenu.inventoryPath,
       waiter: InventoryInstances.waitContentLoading,
     });
-    
-    // User logged into College (where created), switch to Central
+
+    // Logged into College (creation tenant) — switch to Central in the UI
     ConsortiumManager.switchActiveAffiliation(tenantNames.college, tenantNames.central);
-    
-    // Now working in Central tenant
-    // ... test steps ...
   });
 
   after('Delete test data', () => {
     cy.getAdminToken();
-    
-    // Delete from original creation tenants
-    cy.setTenant(Affiliations.College); // Where User A was created
+
+    cy.setTenant(Affiliations.College); // where User A was created
     Users.deleteViaApi(userA.userId);
-    
-    cy.resetTenant(); // Where User B was created (Central)
+
+    cy.resetTenant();                   // where User B was created
     Users.deleteViaApi(userB.userId);
   });
 });
 ```
 
-### Primary Affiliation Design Patterns
-
-**Pattern 1: Test Works in User's Primary Affiliation (No Switch Needed)**
-
-When test needs to work in Member tenant from the start:
-```javascript
-before('Create test data', () => {
-  cy.getAdminToken();
-  
-  // Create user in College tenant - primary affiliation = College
-  cy.setTenant(Affiliations.College);
-  cy.createTempUser([permissions_for_college]).then((userProperties) => {
-    testUser = userProperties;
-    
-    // Assign Central permissions if needed (Central affiliation is automatic)
-    cy.resetTenant();
-    cy.assignPermissionsToExistingUser(testUser.userId, [permissions_for_central]);
-  });
-});
-
-it('Test in College tenant', () => {
-  // User logs directly into College tenant (primary affiliation)
-  cy.setTenant(Affiliations.College);
-  cy.login(testUser.username, testUser.password, {
-    path: TopMenu.inventoryPath,
-    waiter: InventoryInstances.waitContentLoading,
-  });
-  
-  // Already in College tenant - no affiliation switch needed
-  ConsortiumManager.checkCurrentTenantInTopMenu(tenantNames.college);
-  // ... test steps in College tenant ...
-});
-```
-
-**Pattern 2: Test Requires Affiliation Switch**
-
-When test needs to switch between tenants:
-```javascript
-before('Create test data', () => {
-  cy.getAdminToken();
-  
-  // Create user in College tenant - primary affiliation = College
-  cy.setTenant(Affiliations.College);
-  cy.createTempUser([permissions_for_college]).then((userProperties) => {
-    testUser = userProperties;
-    
-    // Assign Central permissions for switch
-    cy.resetTenant();
-    cy.assignPermissionsToExistingUser(testUser.userId, [permissions_for_central]);
-  });
-});
-
-it('Test switches from College to Central', () => {
-  cy.resetTenant();
-  cy.login(testUser.username, testUser.password, {
-    path: TopMenu.inventoryPath,
-    waiter: InventoryInstances.waitContentLoading,
-  });
-  
-  // User logged into College (primary affiliation)
-  // Switch to Central tenant in UI
-  ConsortiumManager.switchActiveAffiliation(tenantNames.college, tenantNames.central);
-  ConsortiumManager.checkCurrentTenantInTopMenu(tenantNames.central);
-  // ... test steps in Central tenant ...
-});
-```
-
-### ECS with Capabilities (Eureka Platform)
+## Imports
 
 ```javascript
-// For Eureka tests using capabilities instead of permissions
-before('Create test data', () => {
-  cy.getAdminToken();
-  
-  const capabsToAssign = [Capabilities.settingsEnabled];
-  const capabSetsToAssign = [
-    CapabilitySets.uiAuthorizationRolesSettingsView,
-  ];
-  
-  // TestRail: "User has been created in member-1 tenant"
-  cy.setTenant(Affiliations.College);
-  cy.createTempUser([]).then((userProperties) => {
-    testData.user = userProperties;
-    
-    // Assign capabilities in member tenant
-    cy.assignCapabilitiesToExistingUser(
-      testData.user.userId,
-      capabsToAssign,
-      capabSetsToAssign,
-    );
-    
-    // Assign Central tenant capabilities (Central affiliation is automatic)
-    cy.resetTenant();
-    cy.assignCapabilitiesToExistingUser(
-      testData.user.userId,
-      [Capabilities.settingsEnabled],
-      [CapabilitySets.uiConsortiaSettingsView],
-    );
-  });
-});
-```
-
-## Common Patterns & Troubleshooting
-
-### Pattern: User Works in Member Tenant Only
-```javascript
-// TestRail: "User created in member-1, works in member-1"
-cy.setTenant(Affiliations.College);
-cy.createTempUser([permissions]).then((userProperties) => {
-  testData.user = userProperties;
-  
-  cy.login(testData.user.username, testData.user.password); // Logs into College
-  // No affiliation switch needed - already in correct tenant
-});
-```
-
-### Pattern: User Created in Central, Works in Central
-```javascript
-// TestRail: "User created in central, works in central"
-cy.resetTenant(); // Central is default
-cy.createTempUser([permissions]).then((userProperties) => {
-  testData.user = userProperties;
-  
-  cy.login(testData.user.username, testData.user.password); // Logs into Central
-  // No affiliation switch needed
-});
-```
-
-### Pattern: Multiple Users, Different Tenants
-```javascript
-// Complex multi-user, multi-tenant scenario
-let centralUser;
-let collegeUser;
-let universityUser;
-
-cy.resetTenant();
-cy.createTempUser([centralPermissions]).then((user) => {
-  centralUser = user;
-});
-
-cy.setTenant(Affiliations.College);
-cy.createTempUser([collegePermissions]).then((user) => {
-  collegeUser = user;
-});
-
-cy.setTenant(Affiliations.University);
-cy.createTempUser([universityPermissions]).then((user) => {
-  universityUser = user;
-});
-
-// Delete each from their creation tenant
-after('Delete test data', () => {
-  cy.getAdminToken();
-  cy.resetTenant();
-  Users.deleteViaApi(centralUser.userId);
-  cy.setTenant(Affiliations.College);
-  Users.deleteViaApi(collegeUser.userId);
-  cy.setTenant(Affiliations.University);
-  Users.deleteViaApi(universityUser.userId);
-});
-```
-
-### Troubleshooting: User Can't See Data in Target Tenant
-**Problem:** User switches to Central but can't see expected data.
-
-**Solution:** Ensure user has:
-1. Correct permissions assigned in target tenant
-2. Correct affiliation assigned (automatic for Central, manual for members)
-3. Switched affiliation in UI using `ConsortiumManager.switchActiveAffiliation()`
-
-### Troubleshooting: User Deletion Fails
-**Problem:** `Users.deleteViaApi()` fails with 404 or permission error.
-
-**Solution:** Verify you're deleting from the correct tenant:
-- Set tenant context to WHERE USER WAS CREATED
-- Not where user logged in or worked
-
-## Required Imports for ECS Tests
-
-```javascript
-import Affiliations from '../../../support/dictionary/affiliations';
+import Affiliations, { tenantNames } from '../../../support/dictionary/affiliations';
 import ConsortiumManager from '../../../support/fragments/consortium-manager/consortiumManager';
-import { tenantNames } from '../../../support/dictionary/affiliations';
 import Users from '../../../support/fragments/users/users';
 import Permissions from '../../../support/dictionary/permissions';
 
-// For Eureka capabilities approach:
+// Eureka capabilities approach:
 import Capabilities from '../../../support/dictionary/capabilities';
 import CapabilitySets from '../../../support/dictionary/capabilitySets';
 ```
 
-## Decision Tree for ECS User Setup
+## Validation checklist
 
-1. **Read TestRail Preconditions** - What tenant is user created in?
-2. **Set Tenant Context** - Use `cy.setTenant()` or `cy.resetTenant()`
-3. **Create User** - Use `cy.createTempUser()` with tenant-specific permissions
-4. **Assign Cross-Tenant Permissions** - Switch to other tenants, use `cy.assignPermissionsToExistingUser()`
-5. **Assign Member Affiliations** - ONLY for College/University (NOT Central)
-6. **Login** - User logs into creation tenant automatically
-7. **Switch Affiliation If Needed** - Use `ConsortiumManager.switchActiveAffiliation()`
-8. **Cleanup** - Delete from creation tenant in `after()` hook
-
-## Validation Checklist
-
-Before completing ECS test implementation, verify:
-
-- [ ] Users created in exact tenant specified by TestRail preconditions
-- [ ] Central affiliation NOT manually assigned (it's automatic)
-- [ ] Member affiliations assigned when required by TestRail
-- [ ] Affiliation switches implemented when TestRail specifies different login tenant
-- [ ] User deletion happens in original creation tenant
-- [ ] Tags include "ECS" suffix (e.g., `smokeECS`, `criticalPathECS`)
-- [ ] All tenant context switches use correct methods (`cy.setTenant()`, `cy.resetTenant()`)
-- [ ] Required imports present (`Affiliations`, `ConsortiumManager`, `tenantNames`)
-
-## Key Differences: ECS vs Non-ECS Tests
-
-| Aspect | Non-ECS Test | ECS Test |
-|--------|-------------|----------|
-| User Creation | Single tenant (default) | Specific tenant via `cy.setTenant()` |
-| Permissions | Assigned during creation | May span multiple tenants |
-| Affiliations | Not relevant | Central automatic, members manual |
-| Login | Direct to application | May require affiliation switch |
-| Deletion | Simple `deleteViaApi()` | Must match creation tenant |
-| Tags | `smoke`, `criticalPath`, etc. | `smokeECS`, `criticalPathECS`, etc. |
-
-## Remember
-
-- **TestRail preconditions are the source of truth** - always follow them exactly
-- **Central affiliation is automatic** - never assign it manually
-- **Login tenant = creation tenant** - always, without exception
-- **Delete from creation tenant** - not from where user worked
-- **Member affiliations are manual** - use `cy.assignAffiliationToUser()`
-- **Affiliation switch ≠ tenant context switch** - UI operation vs API operation
-
-When in doubt, refer back to TestRail preconditions and follow them literally.
+- [ ] Every user created in the exact tenant TestRail's preconditions name
+- [ ] Central affiliation not assigned manually anywhere
+- [ ] Member affiliations assigned where TestRail requires them
+- [ ] Affiliation switch present only where TestRail specifies a login tenant ≠ creation tenant
+- [ ] Every deletion runs in the user's creation tenant
+- [ ] Tags carry the `ECS` suffix (`smokeECS`, `criticalPathECS`)
+- [ ] Tenant context switches use `cy.setTenant()` / `cy.resetTenant()`, not `switchActiveAffiliation()`
+- [ ] `Affiliations`, `ConsortiumManager`, `tenantNames` imported
