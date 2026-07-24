@@ -20,6 +20,7 @@ This repository serves as a skills registry containing guidelines (`SKILL.md`). 
 - `skill-feedback` - Captures user-validated feedback after a skill session and prepares a GitHub-ready report.
 - `testrail-bug-report` - Generates Jira-ready bug reports from failed FOLIO TestRail cases.
 - `unit-testing` - Applies Java unit testing guidance for JUnit 5, Mockito, strict stubbing, and clear test structure.
+- `write-testrail-cases` - Generates structured manual test cases from a Jira story and posts them directly to TestRail. Uses app-specific context files and automatically enriches from Jira, GitHub, and TestRail when context is insufficient.
 - `write-bug` - Drafts reproducible FOLIO bug reports with steps, expected and actual results, and supporting evidence.
 - `write-pr-description` - Drafts PR descriptions following team conventions for purpose, approach, and checklist.
 - `write-testrail-cases` - Writes structured manual TestRail cases from user stories and application context.
@@ -104,6 +105,15 @@ To update to the latest version of our team's AI guidelines, run:
 ```bash
 npx skills update folio-org/folio-eureka-ai-dev
 ```
+## Writing Test Cases
+
+The `write-testrail-cases` skill generates structured manual test cases from a Jira story and posts them to TestRail automatically. It understands FOLIO's domain — module ownership, capability sets, and Eureka architecture.
+
+The skill always presents a **Scenario Analysis** for your review before writing anything, and waits for your confirmation before posting.
+
+### Refreshing context files
+
+If context for your app area is missing or outdated, run `build-app-context`:
 
 ### GitHub issue reporter
 
